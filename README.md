@@ -1,4 +1,4 @@
-# File Integrity Script
+# Python File Extractor
 
 ## Overview
 This repository contains a Python script designed to handle file operations with an emphasis on maintaining integrity during file transfers. It's a simple utility aimed at ensuring that files are copied or extracted (from ZIP and RAR archives) without corruption. This script is ideal for users who need to ensure that their files remain intact after copying, especially in environments where data corruption might be a concern.
