@@ -97,7 +97,7 @@ def copy_file(origin: str, dest: str):
 
     total_size = os.path.getsize(origin)
     dest_file_path = os.path.join(dest, os.path.basename(origin))
-    with open(origin, 'rb') as forigin, open(dest_file_path, 'wb') as fdest, tqdm(
+    with open(origin, 'rb') as forigin, open(dest, 'wb') as fdest, tqdm(
         total=total_size, unit='B', unit_scale=True, desc=f"Copying {os.path.basename(origin)} to {dest_file_path}") as pbar:
         while True:
             buffer = forigin.read(buffer_size)
@@ -122,7 +122,7 @@ def calculate_file_hash(filepath: str):
     """ Calculate the SHA-256 hash of a file """
     sha256_hash = hashlib.sha256()
     with open(filepath, 'rb') as file:
-        for byte_block in iter(lambda: file.read(4096), "b"):
+        for byte_block in iter(lambda: file.read(4096), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
@@ -173,6 +173,8 @@ def main():
     single = args.singlefolder
 
     dest = check_given_arguments(dest, origin, verb) # Will raise at runtime
+
+    # Fix this mess.
 
     if origin.endswith(".rar") or origin.endswith(".zip"):
         if origin.endswith(".rar"):
