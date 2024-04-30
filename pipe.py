@@ -77,9 +77,10 @@ def check_given_arguments(dest: str, origin: str, verb: bool) -> str:
     if checkExistence(dest):
         if not os.path.isdir(dest):
             raise InvalidPathError(f"Specified location {dest} is a file. Destination should be of type: directory")
-        else:
+        elif not os.path.isdir(origin):
             dest = os.path.join(dest, os.path.splitext(os.path.basename(origin))[0]) # Hell awaits me
-            print(f"called {dest}")
+            return dest
+        else:
             return dest
     else: # non existent
         if askUser(f"{dest} does not exist. Do you want to create it?") == False:
@@ -90,15 +91,27 @@ def check_given_arguments(dest: str, origin: str, verb: bool) -> str:
                 print(f"Creating {dest}")
             return dest
 
-def copy_file(origin: str, dest: str):
+def copy_file(src, dst):
     """ Copy a file from src to dst with a progress bar and checksum verification. """
+    if os.path.isdir(src):
+        print(f"Skipped copying directory: {src}")
+        return None  # Return None or an appropriate value for directories
+
     buffer_size = 1024 * 1024 # 1MB
     sha256_hash = hashlib.sha256()
+    total_size = os.path.getsize(src)
 
-    total_size = os.path.getsize(origin)
-    dest_file_path = os.path.join(dest, os.path.basename(origin))
-    with open(origin, 'rb') as forigin, open(dest, 'wb') as fdest, tqdm(
-        total=total_size, unit='B', unit_scale=True, desc=f"Copying {os.path.basename(origin)} to {dest_file_path}") as pbar:
+    if checkExistence(dst):
+        if askUser(f"{dst} already exists. Do you want to overwrite it?"):
+            if verb:
+                print("removing {dst}")
+            os.remove(dst)
+        else:
+            print(f"skipping {src}")
+            return 'skipped'
+
+    with open(src, 'rb') as forigin, open(dst, 'wb') as fdest, tqdm(
+        total=total_size, unit='B', unit_scale=True, desc=f"Copying {os.path.basename(src)} to {dst}") as pbar:
         while True:
             buffer = forigin.read(buffer_size)
             if not buffer:
@@ -106,16 +119,29 @@ def copy_file(origin: str, dest: str):
             fdest.write(buffer)
             sha256_hash.update(buffer)
             pbar.update(len(buffer))
+
     return sha256_hash.hexdigest()
 
-def compare_hashes(original: str, copy: str) -> bool:
-    """ Verify the integrity of the copied file by comparing hashes """
-    original_hash = copy_file(original, copy)
-    copied_hash = calculate_file_hash(copy)
-    
+def compare_hashes(src, dst):
+    """ Compares hashes of the original file and the copied file. """
+    if os.path.isdir(src):
+        print(f"Skipping directory: {src}")
+        return True  # Skip directories
+
+    copied_hash = copy_file(src, dst)
+    if copied_hash is None or copied_hash == 'skipped':
+        return True  # Handle directories or skipped files gracefully
+
+    original_hash = calculate_file_hash(src)
+
     if original_hash == copied_hash:
+        if verb:
+            print(f"Integrity verified for {src}")
         return True
     else:
+        os.remove(dst)
+        if verb:
+            print(f"Hashes did not match. Removing {dst}")
         return False
 
 def calculate_file_hash(filepath: str):
@@ -161,6 +187,21 @@ def containsRar(dest: str) -> bool:
             return True
     return False
 
+def copy_directory_with_integrity(src, dst):
+    """ Recursively copies a directory and its contents with integrity checks for each file """
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+        if verb:
+            print(f"Created directory {dst}")
+
+    for item in os.listdir(src):
+        src_item = os.path.join(src, item)
+        dst_item = os.path.join(dst, item)
+        if os.path.isdir(src_item):
+            copy_directory_with_integrity(src_item, dst_item)  # Recursive call for directories
+        else:
+            if not compare_hashes(src_item, dst_item):
+                print(f"File {src_item} is possibly corrupted. It was deleted automatically.")
 def main():
     global verb 
 
@@ -180,7 +221,7 @@ def main():
         if origin.endswith(".rar"):
             unrarFile(origin, dest)
         if origin.endswith(".zip"):
-            unzipFile(origin, dest) # WARNING: Check if it is even a zip file
+            unzipFile(origin, dest)
         
         if not containsRar(dest):
             return
@@ -192,7 +233,13 @@ def main():
     else:
         if verb:
             print("Starting copy...")
-        compare_hashes(origin, dest) 
+        if os.path.isdir(origin):
+            if verb:
+                print(f"{origin} is of type folder. Copying it's content to {dest}")
+                copy_directory_with_integrity(origin, dest)
+        else:
+            if not compare_hashes(origin, dest):
+                print(f"File {origin} is possibly corrupted. It was deleted automatically")
 
 if __name__ == "__main__":
     main()

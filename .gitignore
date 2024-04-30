@@ -1,0 +1,15 @@
+
+# Compiled Python files
+__pycache__/
+*.py[cod]
+
+# PyInstaller outputs
+build/
+*.spec
+
+# Virtual environment
+pipe2/
+
+# OS generated files
+.DS_Store
+Thumbs.db
